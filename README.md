@@ -1,3 +1,3 @@
-# UPSO_Ejercicios
+# Studio_Ejercicios
 
 
