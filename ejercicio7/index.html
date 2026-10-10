@@ -504,7 +504,6 @@
 
 <span class="var">@export</span> <span class="kw">var</span> speed: <span class="type">float</span> = <span class="num">300.0</span>
 <span class="var">@export</span> <span class="kw">var</span> bullet_scene: <span class="type">PackedScene</span>
-
 <span class="cm"># Color de defensa</span>
 <span class="var">@export</span> <span class="kw">var</span> color_defensa: <span class="type">Color</span> = <span class="type">Color</span>.<span class="kw">YELLOW</span>
 
@@ -518,29 +517,38 @@
 \t<span class="cm"># DESAFÍO 1: Instanciar el nodo MultiplayerSynchronizer</span>
 \t<span class="kw">var</span> sync_node := [[0]]
 \t
-\t<span class="cm"># Nombre fijo explícito para evitar errores de ruta en clientes secundarios (@MultiplayerSynchronizer@N)</span>
+\t<span class="cm"># CLAVE: Asignar un nombre explícito para evitar nombres aleatorios (@MultiplayerSynchronizer@N)</span>
 \tsync_node.name = <span class="str">"PosSynchronizer"</span>
+\t
 \tsync_node.<span class="fn">set_multiplayer_authority</span>(name.<span class="fn">to_int</span>())
 \tsync_node.replication_config = <span class="type">SceneReplicationConfig</span>.<span class="kw">new</span>()
 \tsync_node.replication_config.<span class="fn">add_property</span>(<span class="str">":position"</span>)
+\t
 \t<span class="fn">add_child</span>(sync_node)
 
 <span class="kw">func</span> <span class="fn">_physics_process</span>(_delta: <span class="type">float</span>) -&gt; <span class="type">void</span>:
-\t<span class="cm"># DESAFÍO 2: El Filtro de Autoridad de Red</span>
+\t<span class="cm"># DESAFÍO 2: El Filtro de Autoridad de Red para el movimiento</span>
 \t<span class="kw">if not</span> [[1]]:
 \t\t<span class="kw">return</span>
 
-\t<span class="kw">if not</span> esta_defendiendose:
-\t\t<span class="fn">_procesar_movimiento_local</span>()
+\t<span class="cm"># El movimiento se procesa de forma continua</span>
+\t<span class="fn">_procesar_movimiento_local</span>()
 
-\t<span class="kw">if</span> <span class="type">Input</span>.<span class="fn">is_action_just_pressed</span>(<span class="str">"ui_accept"</span>) <span class="kw">and not</span> esta_defendiendose:
-\t\t<span class="cm"># DESAFÍO 3: Llamada Remota del Disparo vía RPC</span>
-\t\tdisparar_remoto.[[2]]
+<span class="cm"># Capturamos los clics del mouse de forma limpia</span>
+<span class="kw">func</span> <span class="fn">_unhandled_input</span>(event: <span class="type">InputEvent</span>) -&gt; <span class="type">void</span>:
+\t<span class="cm"># Filtro de autoridad de red para las acciones del mouse</span>
+\t<span class="kw">if not</span> <span class="fn">is_multiplayer_authority</span>():
+\t\t<span class="kw">return</span>
 
-\t<span class="kw">if</span> <span class="type">Input</span>.<span class="fn">is_action_just_pressed</span>(<span class="str">"ui_focus_next"</span>) <span class="kw">and</span> defensa_disponible:
-\t\t<span class="fn">_activar_cooldown_defensa</span>()
-\t\t<span class="cm"># DESAFÍO 4: Llamada Remota de la Defensa vía RPC</span>
-\t\taplicar_defensa_remoto.[[3]]
+\t<span class="kw">if</span> event <span class="kw">is</span> <span class="type">InputEventMouseButton</span> <span class="kw">and</span> event.pressed:
+\t\t<span class="cm"># Clic Izquierdo: Disparar</span>
+\t\t<span class="kw">if</span> event.button_index == <span class="kw">MOUSE_BUTTON_LEFT</span>:
+\t\t\tdisparar_remoto.[[2]]
+\t\t
+\t\t<span class="cm"># Clic Derecho: Defenderse (si está disponible el cooldown)</span>
+\t\t<span class="kw">elif</span> event.button_index == <span class="kw">MOUSE_BUTTON_RIGHT</span> <span class="kw">and</span> defensa_disponible:
+\t\t\t<span class="fn">_activar_cooldown_defensa</span>()
+\t\t\taplicar_defensa_remoto.[[3]]
 
 <span class="kw">func</span> <span class="fn">_procesar_movimiento_local</span>() -&gt; <span class="type">void</span>:
 \t<span class="kw">var</span> input_dir := <span class="type">Input</span>.<span class="fn">get_vector</span>(<span class="str">"ui_left"</span>, <span class="str">"ui_right"</span>, <span class="str">"ui_up"</span>, <span class="str">"ui_down"</span>)
@@ -565,19 +573,28 @@
 <span class="var">@rpc</span>([[5]])
 <span class="kw">func</span> <span class="fn">aplicar_defensa_remoto</span>() -&gt; <span class="type">void</span>:
 \testa_defendiendose = <span class="kw">true</span>
+\t
+\t<span class="cm"># 1. Guardamos el color base exacto que le asignó el otro script</span>
+\t<span class="kw">var</span> color_original = modulate
+\t
+\t<span class="cm"># 2. Aplicamos el color de defensa</span>
 \t<span class="fn">_aplicar_color_visual</span>(color_defensa)
+\t
 \t<span class="kw">await</span> <span class="fn">get_tree</span>().<span class="fn">create_timer</span>(<span class="num">1.5</span>).timeout
+\t
 \testa_defendiendose = <span class="kw">false</span>
-\t<span class="fn">_aplicar_color_visual</span>(<span class="type">Color</span>.<span class="kw">WHITE</span>)
+\t
+\t<span class="cm"># 3. Restauramos exactamente el color base que tenía guardado</span>
+\t<span class="fn">_aplicar_color_visual</span>(color_original)
 
 <span class="kw">func</span> <span class="fn">_aplicar_color_visual</span>(color: <span class="type">Color</span>) -&gt; <span class="type">void</span>:
 \tmodulate = color`,
-                fullCode: `extends CharacterBody2D\n\n@export var speed: float = 300.0\n@export var bullet_scene: PackedScene\n\n# Color de defensa\n@export var color_defensa: Color = Color.YELLOW\n\nvar esta_defendiendose: bool = false\nvar defensa_disponible: bool = true\n\nfunc _ready() -> void:\n\tset_multiplayer_authority(name.to_int())\n\tvar sync_node := MultiplayerSynchronizer.new()\n\tsync_node.name = "PosSynchronizer"\n\tsync_node.set_multiplayer_authority(name.to_int())\n\tsync_node.replication_config = SceneReplicationConfig.new()\n\tsync_node.replication_config.add_property(":position")\n\tadd_child(sync_node)\n\nfunc _physics_process(_delta: float) -> void:\n\tif not is_multiplayer_authority():\n\t\treturn\n\n\tif not esta_defendiendose:\n\t\t_procesar_movimiento_local()\n\n\tif Input.is_action_just_pressed("ui_accept") and not esta_defendiendose:\n\t\tdisparar_remoto.rpc()\n\n\tif Input.is_action_just_pressed("ui_focus_next") and defensa_disponible:\n\t\t_activar_cooldown_defensa()\n\t\taplicar_defensa_remoto.rpc()\n\nfunc _procesar_movimiento_local() -> void:\n\tvar input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")\n\tvelocity = input_dir * speed\n\tmove_and_slide()\n\nfunc _activar_cooldown_defensa() -> void:\n\tdefensa_disponible = false\n\tawait get_tree().create_timer(5.0).timeout\n\tdefensa_disponible = true\n\n@rpc("any_peer", "call_local", "reliable")\nfunc disparar_remoto() -> void:\n\tif bullet_scene:\n\t\tvar bala = bullet_scene.instantiate()\n\t\tget_tree().root.add_child(bala)\n\t\tif bala is Node2D:\n\t\t\tbala.global_position = global_position\n\n@rpc("any_peer", "call_local", "reliable")\nfunc aplicar_defensa_remoto() -> void:\n\testa_defendiendose = true\n\t_aplicar_color_visual(color_defensa)\n\tawait get_tree().create_timer(1.5).timeout\n\testa_defendiendose = false\n\t_aplicar_color_visual(Color.WHITE)\n\nfunc _aplicar_color_visual(color: Color) -> void:\n\tmodulate = color`,
+                fullCode: `extends CharacterBody2D\n\n@export var speed: float = 300.0\n@export var bullet_scene: PackedScene\n# Color de defensa\n@export var color_defensa: Color = Color.YELLOW\n\nvar esta_defendiendose: bool = false\nvar defensa_disponible: bool = true\n\nfunc _ready() -> void:\n\tset_multiplayer_authority(name.to_int())\n\tvar sync_node := MultiplayerSynchronizer.new()\n\tsync_node.name = "PosSynchronizer"\n\tsync_node.set_multiplayer_authority(name.to_int())\n\tsync_node.replication_config = SceneReplicationConfig.new()\n\tsync_node.replication_config.add_property(":position")\n\tadd_child(sync_node)\n\nfunc _physics_process(_delta: float) -> void:\n\tif not is_multiplayer_authority():\n\t\treturn\n\t_procesar_movimiento_local()\n\nfunc _unhandled_input(event: InputEvent) -> void:\n\tif not is_multiplayer_authority():\n\t\treturn\n\n\tif event is InputEventMouseButton and event.pressed:\n\t\tif event.button_index == MOUSE_BUTTON_LEFT:\n\t\t\tdisparar_remoto.rpc()\n\t\telif event.button_index == MOUSE_BUTTON_RIGHT and defensa_disponible:\n\t\t\t_activar_cooldown_defensa()\n\t\t\taplicar_defensa_remoto.rpc()\n\nfunc _procesar_movimiento_local() -> void:\n\tvar input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")\n\tvelocity = input_dir * speed\n\tmove_and_slide()\n\nfunc _activar_cooldown_defensa() -> void:\n\tdefensa_disponible = false\n\tawait get_tree().create_timer(5.0).timeout\n\tdefensa_disponible = true\n\n@rpc("any_peer", "call_local", "reliable")\nfunc disparar_remoto() -> void:\n\tif bullet_scene:\n\t\tvar bala = bullet_scene.instantiate()\n\t\tget_tree().root.add_child(bala)\n\t\tif bala is Node2D:\n\t\t\tbala.global_position = global_position\n\n@rpc("any_peer", "call_local", "reliable")\nfunc aplicar_defensa_remoto() -> void:\n\testa_defendiendose = true\n\tvar color_original = modulate\n\t_aplicar_color_visual(color_defensa)\n\tawait get_tree().create_timer(1.5).timeout\n\testa_defendiendose = false\n\t_aplicar_color_visual(color_original)\n\nfunc _aplicar_color_visual(color: Color) -> void:\n\tmodulate = color`,
                 checklist: [
                     { title: "1. Crear Escena 2D del Jugador", desc: "Crea un nodo raíz <strong>CharacterBody2D</strong> con Sprite2D y CollisionShape2D." },
                     { title: "2. Conectar Script y Escena", desc: "Adjunta el script <strong>'PlayerController2D.gd'</strong> y asigna la escena del proyectil al export 'bullet_scene'." },
                     { title: "3. Probar Multi-Instancia Local", desc: "Activa 'Run Multiple Instances' (3 o más instancias) para comprobar la conexión multijugador." },
-                    { title: "4. Validar Eventos RPC Remotos", desc: "Confirma que las acciones de disparo y defensa se reflejen simultáneamente en todas las ventanas." }
+                    { title: "4. Validar Eventos RPC Remotos", desc: "Confirma que el disparo (clic izquierdo) y la defensa (clic derecho) se reflejen simultáneamente en todas las ventanas." }
                 ]
             },
             {
