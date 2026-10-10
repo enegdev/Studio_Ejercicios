@@ -576,9 +576,8 @@
                 checklist: [
                     { title: "1. Crear Escena 2D del Jugador", desc: "Crea un nodo raíz <strong>CharacterBody2D</strong> con Sprite2D y CollisionShape2D." },
                     { title: "2. Conectar Script y Escena", desc: "Adjunta el script <strong>'PlayerController2D.gd'</strong> y asigna la escena del proyectil al export 'bullet_scene'." },
-                    { title: "3. Nombre de Sincronizador Fijo", desc: "Asegúrate de asignar <strong>sync_node.name = 'PosSynchronizer'</strong> para evitar errores de ruta en clientes secundarios." },
-                    { title: "4. Probar Multi-Instancia Local", desc: "Activa 'Run Multiple Instances' (3 o más instancias) para comprobar la conexión multijugador." },
-                    { title: "5. Validar Eventos RPC Remotos", desc: "Confirma que las acciones de disparo y defensa se reflejen simultáneamente en todas las ventanas." }
+                    { title: "3. Probar Multi-Instancia Local", desc: "Activa 'Run Multiple Instances' (3 o más instancias) para comprobar la conexión multijugador." },
+                    { title: "4. Validar Eventos RPC Remotos", desc: "Confirma que las acciones de disparo y defensa se reflejen simultáneamente en todas las ventanas." }
                 ]
             },
             {
@@ -683,7 +682,7 @@
             }
         ],
         expectedResultsChecklist: [
-            { title: "Movimiento Autónomo 🏃‍♂️", desc: "Cada instancia controla a su propio personaje a través de físicas sincronizadas en red." },
+            { title: "Movimiento Autónomo 🏃‍♂️", desc: "Cada instancia controla exclusivamente a su propio personaje a través de las físicas nativas." },
             { title: "Sincronización Ofensiva (Disparo) 🔫", desc: "El proyectil debe instanciarse en la misma posición de la red en todas las ventanas activas al mismo tiempo." },
             { title: "Sincronización Defensiva (Aplicar Defensa) 🛡️", desc: "Al ejecutar la acción AplicarDefensa, el estado y el efecto visual cambian simultáneamente en todas las pantallas." }
         ],
