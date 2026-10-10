@@ -482,14 +482,14 @@
         subtitle: "📅 Semana 7 - Sincronización y Mecánicas RPC",
         objective: {
             title: "🎯 Objetivo del Ejercicio",
-            description: "Lograr que el personaje pueda moverse y realizar 2 mecánicas de interacción en red correctamente sincronizadas. Diseñado para dos instancias de jugador.",
-            subtext: "A continuación, se presenta una guía base como ejemplo a seguir."
+            description: "Lograr que el personaje 2D pueda moverse y realizar 2 mecánicas de interacción en red (disparo y defensa visual) correctamente sincronizadas vía RPC.",
+            subtext: "A continuación, se presenta la plantilla interactiva del personaje con los desafíos a completar."
         },
         options: [
             {
                 id: "godot",
-                label: "⚙️ Godot 4 (GDScript 3D)",
-                filename: "PlayerController3D.gd",
+                label: "⚙️ Godot 4 (GDScript 2D)",
+                filename: "PlayerController2D.gd",
                 docUrl: "https://docs.godotengine.org/en/stable/tutorials/networking/high_level_multiplayer.html",
                 challenges: [
                     { answer: "MultiplayerSynchronizer.new()" },
@@ -499,44 +499,62 @@
                     { answer: '"any_peer", "call_local", "reliable"' },
                     { answer: '"any_peer", "call_local", "reliable"' }
                 ],
-                codeTemplate: `<span class="cm"># Heredar de CharacterBody3D para proyectos 3D</span>
-<span class="kw">extends</span> <span class="type">CharacterBody3D</span>
+                codeTemplate: `<span class="cm"># Heredar de CharacterBody2D para proyectos 2D</span>
+<span class="kw">extends</span> <span class="type">CharacterBody2D</span>
 
-<span class="var">@export</span> <span class="kw">var</span> speed: <span class="type">float</span> = <span class="num">5.0</span>
-<span class="var">@export</span> <span class="kw">var</span> bullet_scene: <span class="type">PackedScene</span> = <span class="fn">preload</span>(<span class="str">"res://bullet.tscn"</span>)
+<span class="var">@export</span> <span class="kw">var</span> speed: <span class="type">float</span> = <span class="num">300.0</span>
+<span class="var">@export</span> <span class="kw">var</span> bullet_scene: <span class="type">PackedScene</span>
+<span class="cm"># Color de defensa configurado en blanco</span>
+<span class="var">@export</span> <span class="kw">var</span> color_defensa: <span class="type">Color</span> = <span class="type">Color</span>.<span class="var">YELLOW</span>
 
 <span class="kw">var</span> esta_defendiendose: <span class="type">bool</span> = <span class="kw">false</span>
 <span class="kw">var</span> defensa_disponible: <span class="type">bool</span> = <span class="kw">true</span>
 
 <span class="kw">func</span> <span class="fn">_ready</span>() -&gt; <span class="type">void</span>:
+\t<span class="cm"># Asignar la autoridad de red al personaje</span>
+\t<span class="fn">set_multiplayer_authority</span>(name.<span class="fn">to_int</span>())
+
 \t<span class="cm"># DESAFÍO 1: Instanciar el nodo MultiplayerSynchronizer</span>
 \t<span class="kw">var</span> sync_node := [[0]]
+\t
+\t<span class="cm"># CLAVE: Asignar un nombre explícito para evitar nombres aleatorios (@MultiplayerSynchronizer@N)</span>
+\tsync_node.name = <span class="str">"PosSynchronizer"</span>
+\t
 \tsync_node.<span class="fn">set_multiplayer_authority</span>(name.<span class="fn">to_int</span>())
 \tsync_node.replication_config = <span class="type">SceneReplicationConfig</span>.<span class="kw">new</span>()
 \tsync_node.replication_config.<span class="fn">add_property</span>(<span class="str">":position"</span>)
+\t
 \t<span class="fn">add_child</span>(sync_node)
 
 <span class="kw">func</span> <span class="fn">_physics_process</span>(_delta: <span class="type">float</span>) -&gt; <span class="type">void</span>:
-\t<span class="cm"># DESAFÍO 2: El Filtro de Autoridad de Red</span>
+\t<span class="cm"># DESAFÍO 2: El Filtro de Autoridad de Red para el movimiento</span>
 \t<span class="kw">if not</span> [[1]]:
 \t\t<span class="kw">return</span>
 
-\t<span class="kw">if not</span> esta_defendiendose:
-\t\t<span class="fn">_procesar_movimiento_local</span>()
+\t<span class="cm"># El movimiento se procesa de forma continua</span>
+\t<span class="fn">_procesar_movimiento_local</span>()
 
-\t<span class="kw">if</span> <span class="type">Input</span>.<span class="fn">is_action_just_pressed</span>(<span class="str">"ui_accept"</span>) <span class="kw">and not</span> esta_defendiendose:
-\t\t<span class="cm"># DESAFÍO 3: Llamada Remota del Disparo vía RPC</span>
-\t\tdisparar_remoto.[[2]]
+<span class="cm"># Capturamos los clics del mouse de forma limpia</span>
+<span class="kw">func</span> <span class="fn">_unhandled_input</span>(event: <span class="type">InputEvent</span>) -&gt; <span class="type">void</span>:
+\t<span class="cm"># Filtro de autoridad de red para las acciones del mouse</span>
+\t<span class="kw">if not</span> <span class="fn">is_multiplayer_authority</span>():
+\t\t<span class="kw">return</span>
 
-\t<span class="kw">if</span> <span class="type">Input</span>.<span class="fn">is_action_just_pressed</span>(<span class="str">"ui_focus_next"</span>) <span class="kw">and</span> defensa_disponible:
-\t\t<span class="fn">_activar_cooldown_defensa</span>()
-\t\t<span class="cm"># DESAFÍO 4: Llamada Remota de la Defensa vía RPC</span>
-\t\taplicar_defensa_remoto.[[3]]
+\t<span class="kw">if</span> event <span class="kw">is</span> <span class="type">InputEventMouseButton</span> <span class="kw">and</span> event.pressed:
+\t\t<span class="cm"># Clic Izquierdo: Disparar</span>
+\t\t<span class="kw">if</span> event.button_index == <span class="var">MOUSE_BUTTON_LEFT</span>:
+\t\t\t<span class="cm"># DESAFÍO 3: Llamada Remota del Disparo vía RPC</span>
+\t\t\tdisparar_remoto.[[2]]
+\t\t
+\t\t<span class="cm"># Clic Derecho: Defenderse (si está disponible el cooldown)</span>
+\t\t<span class="kw">elif</span> event.button_index == <span class="var">MOUSE_BUTTON_RIGHT</span> <span class="kw">and</span> defensa_disponible:
+\t\t\t<span class="fn">_activar_cooldown_defensa</span>()
+\t\t\t<span class="cm"># DESAFÍO 4: Llamada Remota de la Defensa vía RPC</span>
+\t\t\taplicar_defensa_remoto.[[3]]
 
 <span class="kw">func</span> <span class="fn">_procesar_movimiento_local</span>() -&gt; <span class="type">void</span>:
 \t<span class="kw">var</span> input_dir := <span class="type">Input</span>.<span class="fn">get_vector</span>(<span class="str">"ui_left"</span>, <span class="str">"ui_right"</span>, <span class="str">"ui_up"</span>, <span class="str">"ui_down"</span>)
-\t<span class="kw">var</span> dir := <span class="type">Vector3</span>(input_dir.x, <span class="num">0</span>, input_dir.y).<span class="fn">normalized</span>()
-\tvelocity = dir * speed
+\tvelocity = input_dir * speed
 \t<span class="fn">move_and_slide</span>()
 
 <span class="kw">func</span> <span class="fn">_activar_cooldown_defensa</span>() -&gt; <span class="type">void</span>:
@@ -549,30 +567,44 @@
 <span class="kw">func</span> <span class="fn">disparar_remoto</span>() -&gt; <span class="type">void</span>:
 \t<span class="kw">if</span> bullet_scene:
 \t\t<span class="kw">var</span> bala = bullet_scene.<span class="fn">instantiate</span>()
-\t\tbala.global_position = global_position
-\t<span class="fn">get_tree</span>().root.<span class="fn">add_child</span>(bala)
+\t\t<span class="fn">get_tree</span>().root.<span class="fn">add_child</span>(bala)
+\t\t<span class="kw">if</span> bala <span class="kw">is</span> <span class="type">Node2D</span>:
+\t\t\tbala.global_position = global_position
 
 <span class="cm"># DESAFÍO 6: Anotación @rpc para Aplicar Defensa</span>
 <span class="var">@rpc</span>([[5]])
 <span class="kw">func</span> <span class="fn">aplicar_defensa_remoto</span>() -&gt; <span class="type">void</span>:
 \testa_defendiendose = <span class="kw">true</span>
-\t<span class="fn">_aplicar_color_visual</span>(<span class="type">Color</span>(<span class="num">0.0</span>, <span class="num">0.7</span>, <span class="num">1.0</span>, <span class="num">1.0</span>))
+\t
+\t<span class="cm"># 1. Guardamos el color base exacto que le asignó el otro script</span>
+\t<span class="kw">var</span> color_original = modulate
+\t
+\t<span class="cm"># 2. Aplicamos el color de defensa (blanco)</span>
+\t<span class="fn">_aplicar_color_visual</span>(color_defensa)
+\t
 \t<span class="kw">await</span> <span class="fn">get_tree</span>().<span class="fn">create_timer</span>(<span class="num">1.5</span>).timeout
+\t
 \testa_defendiendose = <span class="kw">false</span>
-\t<span class="fn">_aplicar_color_visual</span>(<span class="type">Color</span>(<span class="num">1.0</span>, <span class="num">1.0</span>, <span class="num">1.0</span>, <span class="num">1.0</span>))`,
-                fullCode: `extends CharacterBody3D\n\n@export var speed: float = 5.0\n@export var bullet_scene: PackedScene = preload("res://bullet.tscn")\n\nvar esta_defendiendose: bool = false\nvar defensa_disponible: bool = true\n\nfunc _ready() -> void:\n\tvar sync_node := MultiplayerSynchronizer.new()\n\tsync_node.set_multiplayer_authority(name.to_int())\n\tsync_node.replication_config = SceneReplicationConfig.new()\n\tsync_node.replication_config.add_property(":position")\n\tadd_child(sync_node)\n\nfunc _physics_process(_delta: float) -> void:\n\tif not is_multiplayer_authority():\n\t\treturn\n\n\tif not esta_defendiendose:\n\t\t_procesar_movimiento_local()\n\n\tif Input.is_action_just_pressed("ui_accept") and not esta_defendiendose:\n\t\tdisparar_remoto.rpc()\n\n\tif Input.is_action_just_pressed("ui_focus_next") and defensa_disponible:\n\t\t_activar_cooldown_defensa()\n\t\taplicar_defensa_remoto.rpc()\n\nfunc _procesar_movimiento_local() -> void:\n\tvar input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")\n\tvar dir := Vector3(input_dir.x, 0, input_dir.y).normalized()\n\tvelocity = dir * speed\n\tmove_and_slide()\n\nfunc _activar_cooldown_defensa() -> void:\n\tdefensa_disponible = false\n\tawait get_tree().create_timer(5.0).timeout\n\tdefensa_disponible = true\n\n@rpc("any_peer", "call_local", "reliable")\nfunc disparar_remoto() -> void:\n\tif bullet_scene:\n\t\tvar bala = bullet_scene.instantiate()\n\t\tbala.global_position = global_position\n\t\tget_tree().root.add_child(bala)\n\n@rpc("any_peer", "call_local", "reliable")\nfunc aplicar_defensa_remoto() -> void:\n\testa_defendiendose = true\n\t_aplicar_color_visual(Color(0.0, 0.7, 1.0, 1.0))\n\tawait get_tree().create_timer(1.5).timeout\n\testa_defendiendose = false\n\t_aplicar_color_visual(Color(1.0, 1.0, 1.0, 1.0))`,
+\t
+\t<span class="cm"># 3. Restauramos exactamente el color base que tenía guardado</span>
+\t<span class="fn">_aplicar_color_visual</span>(color_original)
+
+<span class="cm"># Modifica la modulación de color del nodo 2D</span>
+<span class="kw">func</span> <span class="fn">_aplicar_color_visual</span>(color: <span class="type">Color</span>) -&gt; <span class="type">void</span>:
+\tmodulate = color`,
+                fullCode: `# Heredar de CharacterBody2D para proyectos 2D\nextends CharacterBody2D\n\n@export var speed: float = 300.0\n@export var bullet_scene: PackedScene\n# Color de defensa configurado en blanco\n@export var color_defensa: Color = Color.WHITE\n\nvar esta_defendiendose: bool = false\nvar defensa_disponible: bool = true\n\nfunc _ready() -> void:\n\t# Asignar la autoridad de red al personaje\n\tset_multiplayer_authority(name.to_int())\n\n\t# Instanciar el nodo MultiplayerSynchronizer\n\tvar sync_node := MultiplayerSynchronizer.new()\n\t\n\t# CLAVE: Asignar un nombre explícito para evitar nombres aleatorios (@MultiplayerSynchronizer@N)\n\tsync_node.name = "PosSynchronizer"\n\t\n\tsync_node.set_multiplayer_authority(name.to_int())\n\tsync_node.replication_config = SceneReplicationConfig.new()\n\tsync_node.replication_config.add_property(":position")\n\t\n\tadd_child(sync_node)\n\nfunc _physics_process(_delta: float) -> void:\n\t# DESAFÍO 2: El Filtro de Autoridad de Red para el movimiento\n\tif not is_multiplayer_authority():\n\t\treturn\n\n\t# El movimiento se procesa de forma continua\n\t_procesar_movimiento_local()\n\n# Capturamos los clics del mouse de forma limpia\nfunc _unhandled_input(event: InputEvent) -> void:\n\t# Filtro de autoridad de red para las acciones del mouse\n\tif not is_multiplayer_authority():\n\t\treturn\n\n\tif event is InputEventMouseButton and event.pressed:\n\t\t# Clic Izquierdo: Disparar\n\t\tif event.button_index == MOUSE_BUTTON_LEFT:\n\t\t\tdisparar_remoto.rpc()\n\t\t\n\t\t# Clic Derecho: Defenderse (si está disponible el cooldown)\n\t\telif event.button_index == MOUSE_BUTTON_RIGHT and defensa_disponible:\n\t\t\t_activar_cooldown_defensa()\n\t\t\taplicar_defensa_remoto.rpc()\n\nfunc _procesar_movimiento_local() -> void:\n\tvar input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")\n\tvelocity = input_dir * speed\n\tmove_and_slide()\n\nfunc _activar_cooldown_defensa() -> void:\n\tdefensa_disponible = false\n\tawait get_tree().create_timer(5.0).timeout\n\tdefensa_disponible = true\n\n# DESAFÍO 5: Anotación @rpc para el Disparo\n@rpc("any_peer", "call_local", "reliable")\nfunc disparar_remoto() -> void:\n\tif bullet_scene:\n\t\tvar bala = bullet_scene.instantiate()\n\t\tget_tree().root.add_child(bala)\n\t\tif bala is Node2D:\n\t\t\tbala.global_position = global_position\n\n# DESAFÍO 6: Anotación @rpc para Aplicar Defensa\n@rpc("any_peer", "call_local", "reliable")\nfunc aplicar_defensa_remoto() -> void:\n\testa_defendiendose = true\n\t\n\t# 1. Guardamos el color base exacto que le asignó el otro script\n\tvar color_original = modulate\n\t\n\t# 2. Aplicamos el color de defensa (blanco)\n\t_aplicar_color_visual(color_defensa)\n\t\n\tawait get_tree().create_timer(1.5).timeout\n\t\n\testa_defendiendose = false\n\t\n\t# 3. Restauramos exactamente el color base que tenía guardado\n\t_aplicar_color_visual(color_original)\n\n# Modifica la modulación de color del nodo 2D\nfunc _aplicar_color_visual(color: Color) -> void:\n\tmodulate = color`,
                 checklist: [
-                    { title: "1. Crear Escena 3D del Jugador", desc: "Crea un nodo raíz <strong>CharacterBody3D</strong> con MeshInstance3D y CollisionShape3D." },
-                    { title: "2. Conectar Script y Escena", desc: "Adjunta el script <strong>'PlayerController3D.gd'</strong> y asigna la escena <strong>'bullet.tscn'</strong> al export 'bullet_scene'." },
-                    { title: "3. Asignar Material Visual 3D", desc: "Asegúrate de asignar un <strong>StandardMaterial3D</strong> para permitir la variación de color al aplicar defensa." },
+                    { title: "1. Crear Escena 2D del Jugador", desc: "Crea un nodo raíz <strong>CharacterBody2D</strong> con Sprite2D y CollisionShape2D." },
+                    { title: "2. Conectar Script y Escena", desc: "Adjunta el script <strong>'PlayerController2D.gd'</strong> y asigna la escena de la bala al export <strong>'bullet_scene'</strong>." },
+                    { title: "3. Configurar Color de Defensa", desc: "Configura <strong>'color_defensa'</strong> (por defecto Blanco) para visualizar la defensa al hacer clic derecho." },
                     { title: "4. Probar Multi-Instancia Local", desc: "Activa 'Run Multiple Instances' (2 instancias) para probar el control independiente." },
-                    { title: "5. Validar Eventos RPC Remotos", desc: "Confirma que las acciones de disparo y defensa se reflejen simultáneamente en ambas ventanas." }
+                    { title: "5. Validar Eventos RPC Remotos", desc: "Confirma que las acciones de disparo (clic izq.) y defensa (clic der.) se sincronicen correctamente." }
                 ]
             },
             {
                 id: "unity",
-                label: "🎮 Unity (Netcode C# 3D)",
-                filename: "PlayerController3D.cs",
+                label: "🎮 Unity (Netcode C# 2D)",
+                filename: "PlayerController2D.cs",
                 docUrl: "https://docs-multiplayer.unity3d.com/netcode/current/advanced-topics/rpcs/index.html",
                 challenges: [
                     { answer: "IsOwner" },
@@ -584,32 +616,43 @@
                 ],
                 codeTemplate: `<span class="kw">using</span> UnityEngine;
 <span class="kw">using</span> Unity.Netcode;
+<span class="kw">using</span> System.Collections;
 
-<span class="kw">public class</span> <span class="type">PlayerController3D</span> : <span class="type">NetworkBehaviour</span>
+<span class="kw">public class</span> <span class="type">PlayerController2D</span> : <span class="type">NetworkBehaviour</span>
 {
-    [<span class="var">SerializeField</span>] <span class="kw">private float</span> speed = <span class="num">5.0f</span>;
+    [<span class="var">SerializeField</span>] <span class="kw">private float</span> speed = <span class="num">300.0f</span>;
     [<span class="var">SerializeField</span>] <span class="kw">private</span> <span class="type">GameObject</span> bulletPrefab;
+    [<span class="var">SerializeField</span>] <span class="kw">private</span> <span class="type">Color</span> colorDefensa = <span class="type">Color</span>.white;
 
     <span class="kw">private bool</span> estaDefendiendose = <span class="kw">false</span>;
     <span class="kw">private bool</span> defensaDisponible = <span class="kw">true</span>;
+    <span class="kw">private</span> <span class="type">SpriteRenderer</span> spriteRenderer;
+
+    <span class="kw">private void</span> <span class="fn">Awake</span>()
+    {
+        spriteRenderer = <span class="fn">GetComponent</span>&lt;<span class="type">SpriteRenderer</span>&gt;();
+    }
 
     <span class="kw">private void</span> <span class="fn">Update</span>()
     {
         <span class="cm">// DESAFÍO 1: Validar si este cliente es el propietario local</span>
         <span class="kw">if</span> (![[0]]) <span class="kw">return</span>;
 
-        <span class="kw">if</span> (!estaDefendiendose)
-        {
-            <span class="fn">ProcesarMovimientoLocal</span>();
-        }
+        <span class="fn">ProcesarMovimientoLocal</span>();
+        <span class="fn">ProcesarInputAcciones</span>();
+    }
 
-        <span class="kw">if</span> (<span class="type">Input</span>.<span class="fn">GetButtonDown</span>(<span class="str">"Submit"</span>) &amp;&amp; !estaDefendiendose)
+    <span class="kw">private void</span> <span class="fn">ProcesarInputAcciones</span>()
+    {
+        <span class="cm">// Clic Izquierdo: Disparar</span>
+        <span class="kw">if</span> (<span class="type">Input</span>.<span class="fn">GetMouseButtonDown</span>(<span class="num">0</span>))
         {
             <span class="cm">// DESAFÍO 2: Invocar la llamada remota de disparo</span>
             [[1]];
         }
 
-        <span class="kw">if</span> (<span class="type">Input</span>.<span class="fn">GetButtonDown</span>(<span class="str">"Jump"</span>) &amp;&amp; defensaDisponible)
+        <span class="cm">// Clic Derecho: Defenderse (si está disponible el cooldown)</span>
+        <span class="kw">if</span> (<span class="type">Input</span>.<span class="fn">GetMouseButtonDown</span>(<span class="num">1</span>) &amp;&amp; defensaDisponible)
         {
             <span class="fn">ActivarCooldownDefensa</span>();
             <span class="cm">// DESAFÍO 3: Invocar la llamada remota para Aplicar Defensa</span>
@@ -620,8 +663,8 @@
     <span class="kw">private void</span> <span class="fn">ProcesarMovimientoLocal</span>()
     {
         <span class="kw">float</span> moveX = <span class="type">Input</span>.<span class="fn">GetAxisRaw</span>(<span class="str">"Horizontal"</span>);
-        <span class="kw">float</span> moveZ = <span class="type">Input</span>.<span class="fn">GetAxisRaw</span>(<span class="str">"Vertical"</span>);
-        <span class="type">Vector3</span> dir = <span class="kw">new</span> <span class="type">Vector3</span>(moveX, <span class="num">0</span>, moveZ).normalized;
+        <span class="kw">float</span> moveY = <span class="type">Input</span>.<span class="fn">GetAxisRaw</span>(<span class="str">"Vertical"</span>);
+        <span class="type">Vector3</span> dir = <span class="kw">new</span> <span class="type">Vector3</span>(moveX, moveY, <span class="num">0</span>).normalized;
         transform.position += dir * speed * <span class="type">Time</span>.deltaTime;
     }
 
@@ -648,29 +691,43 @@
     [[5]]
     <span class="kw">public void</span> <span class="fn">AplicarDefensaRpc</span>()
     {
-        <span class="fn">AplicarDefensa</span>();
+        <span class="fn">StartCoroutine</span>(<span class="fn">RutinaDefensa</span>());
     }
 
-    <span class="kw">private void</span> <span class="fn">AplicarDefensa</span>()
+    <span class="kw">private</span> <span class="type">IEnumerator</span> <span class="fn">RutinaDefensa</span>()
     {
-        <span class="cm">// Lógica visual y estado de la defensa</span>
         estaDefendiendose = <span class="kw">true</span>;
+        <span class="type">Color</span> colorOriginal = spriteRenderer != <span class="kw">null</span> ? spriteRenderer.color : <span class="type">Color</span>.white;
+        
+        <span class="fn">AplicarColorVisual</span>(colorDefensa);
+        <span class="kw">yield return new</span> <span class="type">WaitForSeconds</span>(<span class="num">1.5f</span>);
+        
+        estaDefendiendose = <span class="kw">false</span>;
+        <span class="fn">AplicarColorVisual</span>(colorOriginal);
+    }
+
+    <span class="kw">private void</span> <span class="fn">AplicarColorVisual</span>(<span class="type">Color</span> color)
+    {
+        <span class="kw">if</span> (spriteRenderer != <span class="kw">null</span>)
+        {
+            spriteRenderer.color = color;
+        }
     }
 }`,
-                fullCode: `using UnityEngine;\nusing Unity.Netcode;\n\npublic class PlayerController3D : NetworkBehaviour\n{\n    [SerializeField] private float speed = 5.0f;\n    [SerializeField] private GameObject bulletPrefab;\n\n    private bool estaDefendiendose = false;\n    private bool defensaDisponible = true;\n\n    private void Update()\n    {\n        if (!IsOwner) return;\n\n        if (!estaDefendiendose)\n        {\n            ProcesarMovimientoLocal();\n        }\n\n        if (Input.GetButtonDown("Submit") && !estaDefendiendose)\n        {\n            DispararRpc();\n        }\n\n        if (Input.GetButtonDown("Jump") && defensaDisponible)\n        {\n            ActivarCooldownDefensa();\n            AplicarDefensaRpc();\n        }\n    }\n\n    private void ProcesarMovimientoLocal()\n    {\n        float moveX = Input.GetAxisRaw("Horizontal");\n        float moveZ = Input.GetAxisRaw("Vertical");\n        Vector3 dir = new Vector3(moveX, 0, moveZ).normalized;\n        transform.position += dir * speed * Time.deltaTime;\n    }\n\n    private async void ActivarCooldownDefensa()\n    {\n        defensaDisponible = false;\n        await System.Threading.Tasks.Task.Delay(5000);\n        defensaDisponible = true;\n    }\n\n    [Rpc(SendTo.Everyone)]\n    public void DispararRpc()\n    {\n        if (bulletPrefab != null)\n        {\n            GameObject bala = Instantiate(bulletPrefab, transform.position, Quaternion.identity);\n            bala.GetComponent<NetworkObject>().Spawn();\n        }\n    }\n\n    [Rpc(SendTo.Everyone)]\n    public void AplicarDefensaRpc()\n    {\n        AplicarDefensa();\n    }\n\n    private void AplicarDefensa()\n    {\n        estaDefendiendose = true;\n    }\n}`,
+                fullCode: `using UnityEngine;\nusing Unity.Netcode;\nusing System.Collections;\n\npublic class PlayerController2D : NetworkBehaviour\n{\n    [SerializeField] private float speed = 300.0f;\n    [SerializeField] private GameObject bulletPrefab;\n    [SerializeField] private Color colorDefensa = Color.white;\n\n    private bool estaDefendiendose = false;\n    private bool defensaDisponible = true;\n    private SpriteRenderer spriteRenderer;\n\n    private void Awake()\n    {\n        spriteRenderer = GetComponent<SpriteRenderer>();\n    }\n\n    private void Update()\n    {\n        if (!IsOwner) return;\n\n        ProcesarMovimientoLocal();\n        ProcesarInputAcciones();\n    }\n\n    private void ProcesarInputAcciones()\n    {\n        if (Input.GetMouseButtonDown(0))\n        {\n            DispararRpc();\n        }\n\n        if (Input.GetMouseButtonDown(1) && defensaDisponible)\n        {\n            ActivarCooldownDefensa();\n            AplicarDefensaRpc();\n        }\n    }\n\n    private void ProcesarMovimientoLocal()\n    {\n        float moveX = Input.GetAxisRaw("Horizontal");\n        float moveY = Input.GetAxisRaw("Vertical");\n        Vector3 dir = new Vector3(moveX, moveY, 0).normalized;\n        transform.position += dir * speed * Time.deltaTime;\n    }\n\n    private async void ActivarCooldownDefensa()\n    {\n        defensaDisponible = false;\n        await System.Threading.Tasks.Task.Delay(5000);\n        defensaDisponible = true;\n    }\n\n    [Rpc(SendTo.Everyone)]\n    public void DispararRpc()\n    {\n        if (bulletPrefab != null)\n        {\n            GameObject bala = Instantiate(bulletPrefab, transform.position, Quaternion.identity);\n            bala.GetComponent<NetworkObject>().Spawn();\n        }\n    }\n\n    [Rpc(SendTo.Everyone)]\n    public void AplicarDefensaRpc()\n    {\n        StartCoroutine(RutinaDefensa());\n    }\n\n    private IEnumerator RutinaDefensa()\n    {\n        estaDefendiendose = true;\n        Color colorOriginal = spriteRenderer != null ? spriteRenderer.color : Color.white;\n        \n        AplicarColorVisual(colorDefensa);\n        yield return new WaitForSeconds(1.5f);\n        \n        estaDefendiendose = false;\n        AplicarColorVisual(colorOriginal);\n    }\n\n    private void AplicarColorVisual(Color color)\n    {\n        if (spriteRenderer != null)\n        {\n            spriteRenderer.color = color;\n        }\n    }\n}`,
                 checklist: [
-                    { title: "1. Crear el Script 'PlayerController3D.cs'", desc: "Crea el archivo C# en Assets/Scripts y ajústalo al Prefab 3D del personaje." },
-                    { title: "2. Componente NetworkObject", desc: "Asegúrate de incluir <strong>NetworkObject</strong> en el Jugador y en el Proyectil." },
-                    { title: "3. Asignar Prefab de Proyectil", desc: "Arrastra el prefab de la bala al campo <strong>'bulletPrefab'</strong> en el Inspector." },
+                    { title: "1. Crear el Script 'PlayerController2D.cs'", desc: "Crea el archivo C# en Assets/Scripts y adjúntalo al Prefab 2D del personaje." },
+                    { title: "2. Componentes NetworkObject y SpriteRenderer", desc: "Asegúrate de incluir <strong>NetworkObject</strong> y <strong>SpriteRenderer</strong> en el Jugador y el Proyectil." },
+                    { title: "3. Asignar Prefab de Proyectil y Color", desc: "Arrastra el prefab de la bala al campo <strong>'bulletPrefab'</strong> y ajusta el <strong>'colorDefensa'</strong>." },
                     { title: "4. Registrar en NetworkManager", desc: "Añade los prefabs a la lista de <strong>NetworkPrefabs</strong> del NetworkManager." },
-                    { title: "5. Probar Build vs Editor", desc: "Genera un ejecutable e inicia Host/Client para comprobar el funcionamiento de AplicarDefensa en red." }
+                    { title: "5. Probar Build vs Editor", desc: "Genera un ejecutable e inicia Host/Client para comprobar el movimiento, disparo y defensa en red." }
                 ]
             }
         ],
         expectedResultsChecklist: [
-            { title: "Movimiento Autónomo 3D 🏃‍♂️", desc: "Cada instancia controla exclusivamente a su propio personaje 3D a través de las físicas nativas." },
-            { title: "Sincronización Ofensiva (Disparo) 🔫", desc: "El proyectil debe instanciarse en la misma posición de la red en todas las ventanas activas al mismo tiempo." },
-            { title: "Sincronización Defensiva (Aplicar Defensa) 🛡️", desc: "Al ejecutar la acción AplicarDefensa, el estado y el efecto visual cambian simultáneamente en todas las pantallas." }
+            { title: "Movimiento Autónomo 2D 🏃‍♂️", desc: "Cada instancia controla exclusivamente a su propio personaje 2D a través de las físicas nativas." },
+            { title: "Sincronización Ofensiva (Disparo) 🔫", desc: "El proyectil debe instanciarse en la misma posición de la red en todas las ventanas activas al mismo tiempo con clic izquierdo." },
+            { title: "Sincronización Defensiva (Aplicar Defensa) 🛡️", desc: "Al ejecutar la acción Aplicar Defensa con clic derecho, el estado y el color visual cambian a blanco durante 1.5s en todas las pantallas." }
         ],
         delivery: {
             instructions: `Exporta la build en formato <strong>.exe</strong> (junto a sus archivos de datos adjuntos) e incluye la <strong>carpeta de scripts</strong> del proyecto. Comprímelo todo en un archivo <strong>.zip</strong> o <strong>.rar</strong> y súbelo a la carpeta compartida.`,
